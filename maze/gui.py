@@ -53,15 +53,21 @@ SVG_UP = QtSvg.QSvgRenderer(UP_FILE)
 SVG_LEFT = QtSvg.QSvgRenderer(LEFT_FILE)
 SVG_RIGHT = QtSvg.QSvgRenderer(RIGHT_FILE)
 
+UP = b'^'
+DOWN = b'v'
+LEFT = b'<'
+RIGHT = b'>'
+
 DIRS = {
-    b'^': SVG_UP,
-    b'<': SVG_LEFT,
-    b'>': SVG_RIGHT,
-    b'v': SVG_DOWN,
+    UP: SVG_UP,
+    LEFT: SVG_LEFT,
+    RIGHT: SVG_RIGHT,
+    DOWN: SVG_DOWN,
 }
 
-ROAD = [TARGET_VALUE, GRASS_VALUE]
-ROAD.extend(DUDE_VALUE_LIST)
+ROAD = [TARGET_VALUE, GRASS_VALUE] + DUDE_VALUE_LIST
+# ROAD_VERT_NEIGHBOURS = [TARGET_VALUE, UP, DOWN] + DUDE_VALUE_LIST
+# ROAD_HORIZ_NEIGHBOURS = [TARGET_VALUE, LEFT, RIGHT] + DUDE_VALUE_LIST
 
 
 def pixels_to_logical(x, y):
@@ -145,7 +151,8 @@ class MazeGUI:
             self.window, "Save file", expanduser("~"), "Text Files (*.txt)"
         )[0]
 
-        numpy.savetxt(filename, self.grid.array)
+        if filename:
+            numpy.savetxt(filename, self.grid.array)
 
     def load_dialog(self):
         filename = QtWidgets.QFileDialog.getOpenFileName(
@@ -153,7 +160,8 @@ class MazeGUI:
         )[0]
 
         try:
-            self.grid.init_grid(numpy.loadtxt(filename, dtype=numpy.int8))
+            if filename:
+                self.grid.init_grid(numpy.loadtxt(filename, dtype=numpy.int8))
         except ValueError as e:
             self.error_dialog("Load error", e.__str__())
 
@@ -285,7 +293,7 @@ class GridWidget(QtWidgets.QWidget):
                     SVG_TARGET.render(painter, rect)
                 else:
                     if self.array[row, column] in DUDE_VALUE_LIST:
-                        # if there is any dude
+                        # if there is any dude then draw him
                         SVG_DUDE_LIST[DUDE_VALUE_LIST.index(self.array[row, column])].render(painter, rect)
 
     def mousePressEvent(self, event):
