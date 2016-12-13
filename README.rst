@@ -30,7 +30,9 @@ You may compile code and run tests by typing:
 
 Run the application by ``python -m maze``
 
+Images
+======
 
-These images were created by the `Kenney <http://kenney.nl/>`__ studio, and were kindly
+All images were created by the `Kenney <http://kenney.nl/>`__ studio, and were kindly
 released into the Public Domain. They can be downloaded from
 `OpenGameArt.org <http://opengameart.org/users/kenney>`__.

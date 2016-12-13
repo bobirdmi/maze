@@ -1,16 +1,26 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg, uic
 import numpy
+from os.path import expanduser
 
 
 CELL_SIZE = 32
 CELL_ROLE = QtCore.Qt.UserRole
 WALL_VALUE = -1
 GRASS_VALUE = 0
+TARGET_VALUE = 1
 
 UI_PATH = './ui/'
-IMAGE_PATH = './ui/images/'
+IMAGE_PATH = './ui/pics/'
 SVG_GRASS = QtSvg.QSvgRenderer(IMAGE_PATH + 'grass.svg')
 SVG_WALL = QtSvg.QSvgRenderer(IMAGE_PATH + 'wall.svg')
+
+
+def pixels_to_logical(x, y):
+    return y // CELL_SIZE, x // CELL_SIZE
+
+
+def logical_to_pixels(row, column):
+    return column * CELL_SIZE, row * CELL_SIZE
 
 
 class MazeGUI():
@@ -33,10 +43,18 @@ class MazeGUI():
         self.grid = GridWidget(array)
         scroll_area.setWidget(self.grid)
 
+        self.set_buttons()
+        self.set_list_widget()
+
+    def set_buttons(self):
         action = self.window.findChild(QtWidgets.QAction, 'actionNew')
         action.triggered.connect(lambda: self.new_dialog())
 
-        self.set_list_widget()
+        action = self.window.findChild(QtWidgets.QAction, 'actionSave')
+        action.triggered.connect(lambda: self.save_dialog())
+
+        action = self.window.findChild(QtWidgets.QAction, 'actionLoad')
+        action.triggered.connect(lambda: self.load_dialog())
 
     def set_list_widget(self):
         # získáme paletu vytvořenou v Qt Designeru
@@ -67,6 +85,20 @@ class MazeGUI():
         item.setData(CELL_ROLE, role_value)
 
         return item
+
+    def save_dialog(self):
+        filename = QtWidgets.QFileDialog.getSaveFileName(
+            self.window, "Save file", expanduser("~"), "Text Files (*.txt)"
+        )[0]
+
+        numpy.savetxt(filename, self.grid.array)
+
+    def load_dialog(self):
+        filename = QtWidgets.QFileDialog.getOpenFileName(
+            self.window, "Open file", expanduser("~"), "Text Files (*.txt)"
+        )[0]
+
+        self.grid.array = numpy.loadtxt(filename, dtype=numpy.int8)
 
     def new_dialog(self):
         # Vytvoříme nový dialog.
@@ -100,14 +132,6 @@ class MazeGUI():
 
         # Překreslení celého Gridu
         self.grid.update()
-
-
-def pixels_to_logical(x, y):
-    return y // CELL_SIZE, x // CELL_SIZE
-
-
-def logical_to_pixels(row, column):
-    return column * CELL_SIZE, row * CELL_SIZE
 
 
 class GridWidget(QtWidgets.QWidget):
