@@ -1,0 +1,16 @@
+__pycache__/
+__env__/
+build/
+.cache/
+*.so
+*.c
+*.pyd
+*.html
+*.egg-info
+
+# profile data
+prof/
+
+# IDE
+.idea/
+
