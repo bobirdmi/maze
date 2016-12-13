@@ -18,6 +18,7 @@ DUDE_NUM = len(DUDE_VALUE_LIST)
 
 UI_PATH = './ui/'
 IMAGE_PATH = UI_PATH + 'pics/'
+ARROW_PATH = IMAGE_PATH + 'arrows/'
 
 def get_filename(name):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
@@ -33,12 +34,30 @@ DUDE_FILE_LIST = [get_filename(IMAGE_PATH + 'dude1.svg'), get_filename(IMAGE_PAT
                   get_filename(IMAGE_PATH + 'dude3.svg'), get_filename(IMAGE_PATH + 'dude4.svg'),
                   get_filename(IMAGE_PATH + 'dude5.svg')]
 
+UP_FILE = get_filename(ARROW_PATH + 'up.svg')
+DOWN_FILE = get_filename(ARROW_PATH + 'down.svg')
+LEFT_FILE = get_filename(ARROW_PATH + 'left.svg')
+RIGHT_FILE = get_filename(ARROW_PATH + 'right.svg')
+
 SVG_GRASS = QtSvg.QSvgRenderer(GRASS_FILE)
 SVG_WALL = QtSvg.QSvgRenderer(WALL_FILE)
 SVG_TARGET = QtSvg.QSvgRenderer(TARGET_FILE)
 SVG_DUDE_LIST = [QtSvg.QSvgRenderer(DUDE_FILE_LIST[0]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[1]),
                  QtSvg.QSvgRenderer(DUDE_FILE_LIST[2]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[3]),
                  QtSvg.QSvgRenderer(DUDE_FILE_LIST[4])]
+
+SVG_DOWN = QtSvg.QSvgRenderer(DOWN_FILE)
+SVG_UP = QtSvg.QSvgRenderer(UP_FILE)
+SVG_LEFT = QtSvg.QSvgRenderer(LEFT_FILE)
+SVG_RIGHT = QtSvg.QSvgRenderer(RIGHT_FILE)
+
+DIRS = {
+    b'^': SVG_UP,
+    b'<': SVG_LEFT,
+    b'>': SVG_RIGHT,
+    b'v': SVG_DOWN,
+}
+
 
 
 def pixels_to_logical(x, y):
@@ -130,7 +149,7 @@ class MazeGUI:
         )[0]
 
         try:
-            self.grid.array = numpy.loadtxt(filename, dtype=numpy.int8)
+            self.grid.init_grid(numpy.loadtxt(filename, dtype=numpy.int8))
         except ValueError as e:
             self.error_dialog("Load error", e.__str__())
 
@@ -196,13 +215,16 @@ class GridWidget(QtWidgets.QWidget):
         Saves the input array as self.array and initializes grid of the appropriate size.
         """
         self.array = array
-        self.path_list = None
         self.array[1, 1] = TARGET_VALUE
+        self.analyzed_maze = None
+        self.path_list = None
 
         size = logical_to_pixels(*array.shape)
         self.setMinimumSize(*size)
         self.setMaximumSize(*size)
         self.resize(*size)
+
+        self.update_path()
 
     def paintEvent(self, event):
         rect = event.rect()  # získáme informace o překreslované oblasti
@@ -237,9 +259,15 @@ class GridWidget(QtWidgets.QWidget):
                 elif self.array[row, column] == TARGET_VALUE:
                     SVG_TARGET.render(painter, rect)
                 else:
-                    for i in range(DUDE_NUM):
-                        if self.array[row, column] == DUDE_VALUE_LIST[i]:
-                            SVG_DUDE_LIST[i].render(painter, rect)
+                    if self.array[row, column] in DUDE_VALUE_LIST:
+                        SVG_DUDE_LIST[DUDE_VALUE_LIST.index(self.array[row, column])].render(painter, rect)
+                    else:
+                        # draw paths by arrows
+                        if self.analyzed_maze is not None:
+                            for i in range(DUDE_NUM):
+                                if self.path_list[i] is not None and (row, column) in self.path_list[i]:
+                                    DIRS[self.analyzed_maze.directions[row, column]].render(painter, rect)
+                                    break
 
     def mousePressEvent(self, event):
         # převedeme klik na souřadnice matice
@@ -247,6 +275,7 @@ class GridWidget(QtWidgets.QWidget):
 
         # Pokud jsme v matici, aktualizujeme data
         if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
+            # too few targets, cannot remove
             if self.array[row, column] == TARGET_VALUE:
                 index = numpy.where(self.array == TARGET_VALUE)
                 if len(index[0]) < 2:
@@ -266,18 +295,20 @@ class GridWidget(QtWidgets.QWidget):
 
             # tímto zajistíme překreslení celého widgetu
             self.update()
+            self.update_path()
 
-            analyzed_maze = analyze(self.array)
-            self.path_list = [None for x in range(DUDE_NUM)]
+    def update_path(self):
+        self.analyzed_maze = analyze(self.array)
+        self.path_list = [None for x in range(DUDE_NUM)]
 
-            for i in range(DUDE_NUM):
-                index = numpy.where(self.array == DUDE_VALUE_LIST[i])
-                if len(index[0]) > 0:
-                    try:
-                        self.path_list[i] = analyzed_maze.path(index[0][0], index[1][0])
-                    except ValueError:
-                        # unreachable cell so do nothing
-                        pass
+        for i in range(DUDE_NUM):
+            index = numpy.where(self.array == DUDE_VALUE_LIST[i])
+            if len(index[0]) > 0:
+                try:
+                    self.path_list[i] = self.analyzed_maze.path(index[0][0], index[1][0])
+                except ValueError:
+                    # unreachable cell so do nothing
+                    pass
 
 
 def show_gui():
