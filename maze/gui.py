@@ -56,6 +56,9 @@ class MazeGUI():
         action = self.window.findChild(QtWidgets.QAction, 'actionLoad')
         action.triggered.connect(lambda: self.load_dialog())
 
+        action = self.window.findChild(QtWidgets.QAction, 'actionAbout')
+        action.triggered.connect(lambda: self.about_dialog())
+
     def set_list_widget(self):
         # získáme paletu vytvořenou v Qt Designeru
         palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
@@ -98,7 +101,29 @@ class MazeGUI():
             self.window, "Open file", expanduser("~"), "Text Files (*.txt)"
         )[0]
 
-        self.grid.array = numpy.loadtxt(filename, dtype=numpy.int8)
+        try:
+            self.grid.array = numpy.loadtxt(filename, dtype=numpy.int8)
+        except ValueError as e:
+            self.error_dialog("Load error", e.__str__())
+
+    def about_dialog(self):
+        title = "Maze"
+        description = "<p>This app provides maze solver in Cython with GUI.</p>\n"
+        link = "<p>Link on <a href='https://github.com/bobirdmi/maze'>GitHub</a></p>\n"
+        images = "<p>All images were created by the <a href='http://kenney.nl/'>Kenney</a> studio, " \
+                 "and were kindly released into the Public Domain. They can be downloaded from " \
+                 "<a href='http://opengameart.org/users/kenney'>OpenGameArt.org</a>.</p>\n"
+        authors = "<p>Copyright (C) 2016 Dmitriy Bobir bobirdima@gmail.com</p>" \
+                  "<p>Copyright (C) 2016 Miro Hrončok miro@hroncok.cz</p>" \
+                  "<p>Copyright (C) 2016 Red Hat, Inc.</p>"
+        license_text = "<p>Licensed under GNU General Public License version 3</p>"
+
+        body = description + link + images + authors + license_text
+
+        QtWidgets.QMessageBox.about(self.window, title, body)
+
+    def error_dialog(self, title, body):
+        QtWidgets.QMessageBox.critical(self.window, title, body)
 
     def new_dialog(self):
         # Vytvoříme nový dialog.
