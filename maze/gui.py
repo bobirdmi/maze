@@ -1,18 +1,42 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg, uic
 import numpy
 from os.path import expanduser
+import os
 
 
 CELL_SIZE = 32
 CELL_ROLE = QtCore.Qt.UserRole
+
+
 WALL_VALUE = -1
 GRASS_VALUE = 0
 TARGET_VALUE = 1
+DUDE_VALUE_LIST = [2, 3, 4, 5, 6]
+DUDE_NUM = len(DUDE_VALUE_LIST)
 
 UI_PATH = './ui/'
-IMAGE_PATH = './ui/pics/'
-SVG_GRASS = QtSvg.QSvgRenderer(IMAGE_PATH + 'grass.svg')
-SVG_WALL = QtSvg.QSvgRenderer(IMAGE_PATH + 'wall.svg')
+IMAGE_PATH = UI_PATH + 'pics/'
+
+def get_filename(name):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+
+
+UI_MAIN_WINDOW = get_filename(UI_PATH + 'mainwindow.ui')
+UI_NEW_MAZE = get_filename(UI_PATH + 'newmaze.ui')
+
+GRASS_FILE = get_filename(IMAGE_PATH + 'grass.svg')
+WALL_FILE = get_filename(IMAGE_PATH + 'wall.svg')
+TARGET_FILE = get_filename(IMAGE_PATH + 'castle.svg')
+DUDE_FILE_LIST = [get_filename(IMAGE_PATH + 'dude1.svg'), get_filename(IMAGE_PATH + 'dude2.svg'),
+                  get_filename(IMAGE_PATH + 'dude3.svg'), get_filename(IMAGE_PATH + 'dude4.svg'),
+                  get_filename(IMAGE_PATH + 'dude5.svg')]
+
+SVG_GRASS = QtSvg.QSvgRenderer(GRASS_FILE)
+SVG_WALL = QtSvg.QSvgRenderer(WALL_FILE)
+SVG_TARGET = QtSvg.QSvgRenderer(TARGET_FILE)
+SVG_DUDE_LIST = [QtSvg.QSvgRenderer(DUDE_FILE_LIST[0]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[1]),
+                 QtSvg.QSvgRenderer(DUDE_FILE_LIST[2]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[3]),
+                 QtSvg.QSvgRenderer(DUDE_FILE_LIST[4])]
 
 
 def pixels_to_logical(x, y):
@@ -23,13 +47,13 @@ def logical_to_pixels(row, column):
     return column * CELL_SIZE, row * CELL_SIZE
 
 
-class MazeGUI():
+class MazeGUI:
     def __init__(self):
         self.app = QtWidgets.QApplication([])
 
         self.window = QtWidgets.QMainWindow()
 
-        with open(UI_PATH + 'mainwindow.ui') as f:
+        with open(UI_MAIN_WINDOW) as f:
             uic.loadUi(f, self.window)
 
         # bludiště zatím nadefinované rovnou v kódu
@@ -70,19 +94,21 @@ class MazeGUI():
             # zakázáno (v Designeru selectionMode=SingleSelection).
             # Projdeme "všechny vybrané položky", i když víme že bude max. jedna
             for item in palette.selectedItems():
-                # print(item.data(CELL_ROLE))
-                # grid.selected = item.data(QtCore.Qt.UserRole)
                 self.grid.selected = item.data(CELL_ROLE)
 
         palette.itemSelectionChanged.connect(item_activated)
 
-        palette.addItem(self.create_list_widget_item('Grass', 'grass.svg', GRASS_VALUE))  # přidáme položku do palety
-        palette.addItem(self.create_list_widget_item('Wall', 'wall.svg', WALL_VALUE))
+        palette.addItem(self.create_list_widget_item('Grass', GRASS_FILE, GRASS_VALUE))  # přidáme položku do palety
+        palette.addItem(self.create_list_widget_item('Wall', WALL_FILE, WALL_VALUE))
+        palette.addItem(self.create_list_widget_item('Target', TARGET_FILE, TARGET_VALUE))
+        for i in range(DUDE_NUM):
+            palette.addItem(self.create_list_widget_item('Dude ' + str(i), DUDE_FILE_LIST[i], DUDE_VALUE_LIST[i]))
+
         palette.setCurrentRow(1)
 
     def create_list_widget_item(self, item_label, image_file, role_value):
         item = QtWidgets.QListWidgetItem(item_label)  # vytvoříme položku
-        icon = QtGui.QIcon(IMAGE_PATH + image_file)  # ikonu
+        icon = QtGui.QIcon(image_file)  # ikonu
         item.setIcon(icon)  # přiřadíme ikonu položce
 
         item.setData(CELL_ROLE, role_value)
@@ -132,7 +158,7 @@ class MazeGUI():
         dialog = QtWidgets.QDialog(self.window)
 
         # Načteme layout z Qt Designeru
-        with open(UI_PATH + 'newmaze.ui') as f:
+        with open(UI_NEW_MAZE) as f:
             uic.loadUi(f, dialog)
 
         # Zobrazíme dialog.
@@ -150,10 +176,8 @@ class MazeGUI():
         rows = dialog.findChild(QtWidgets.QSpinBox, 'heightBox').value()
 
         # Vytvoření nového bludiště
-        self.grid.array = numpy.zeros((rows, cols), dtype=numpy.int8)
-
-        # Bludiště může být jinak velké, tak musíme změnit velikost Gridu;
-        self.grid.set_size()
+        # Bludiště může být jinak velké, tak musíme změnit velikost Gridu
+        self.grid.init_grid(numpy.zeros((rows, cols), dtype=numpy.int8))
 
         # Překreslení celého Gridu
         self.grid.update()
@@ -162,23 +186,30 @@ class MazeGUI():
 class GridWidget(QtWidgets.QWidget):
     def __init__(self, array):
         super().__init__()  # musíme zavolat konstruktor předka
+        # initialize grid according to array size
+        self.init_grid(array)
+
+    def init_grid(self, array):
+        """
+        Saves the input array as self.array and initializes grid of the appropriate size.
+        """
         self.array = array
-        # nastavíme velikost podle velikosti matice, jinak je náš widget příliš malý
-        self.set_size()
 
-    def set_size(self, array=None):
-        """
-        Set grid size according to self.array, if "array" parameter is None.
-        Otherwise set it by "array" parameter.
-        """
-        if array is not None:
-            size = logical_to_pixels(*array.shape)
-        else:
-            size = logical_to_pixels(*self.array.shape)
-
+        size = logical_to_pixels(*array.shape)
         self.setMinimumSize(*size)
         self.setMaximumSize(*size)
         self.resize(*size)
+
+        # find positions of all dudes
+        # self.find_dude_positions()
+
+    def find_dude_positions(self):
+        self.dude_pos_list = [None for x in range(DUDE_NUM)]
+
+        for i in range(DUDE_NUM):
+            index = numpy.where(self.array == DUDE_VALUE_LIST[i])
+            if index:
+                self.dude_pos_list[i] = (index[0][0], index[1][0])
 
     def paintEvent(self, event):
         rect = event.rect()  # získáme informace o překreslované oblasti
@@ -210,6 +241,12 @@ class GridWidget(QtWidgets.QWidget):
                 # zdi dáme jen tam, kam patří
                 if self.array[row, column] < 0:
                     SVG_WALL.render(painter, rect)
+                elif self.array[row, column] == TARGET_VALUE:
+                    SVG_TARGET.render(painter, rect)
+                else:
+                    for i in range(DUDE_NUM):
+                        if self.array[row, column] == DUDE_VALUE_LIST[i]:
+                            SVG_DUDE_LIST[i].render(painter, rect)
 
     def mousePressEvent(self, event):
         # převedeme klik na souřadnice matice
@@ -218,6 +255,11 @@ class GridWidget(QtWidgets.QWidget):
         # Pokud jsme v matici, aktualizujeme data
         if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
             if event.button() == QtCore.Qt.LeftButton:
+                if self.selected in DUDE_VALUE_LIST:
+                    index = numpy.where(self.array == self.selected)
+                    if len(index[0]) > 0:
+                        self.array[index[0][0], index[1][0]] = GRASS_VALUE
+
                 self.array[row, column] = self.selected
             elif event.button() == QtCore.Qt.RightButton:
                 self.array[row, column] = GRASS_VALUE
