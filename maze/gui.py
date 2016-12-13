@@ -3,6 +3,8 @@ import numpy
 from os.path import expanduser
 import os
 
+from maze import analyze
+
 
 CELL_SIZE = 32
 CELL_ROLE = QtCore.Qt.UserRole
@@ -194,22 +196,13 @@ class GridWidget(QtWidgets.QWidget):
         Saves the input array as self.array and initializes grid of the appropriate size.
         """
         self.array = array
+        self.path_list = None
+        self.array[1, 1] = TARGET_VALUE
 
         size = logical_to_pixels(*array.shape)
         self.setMinimumSize(*size)
         self.setMaximumSize(*size)
         self.resize(*size)
-
-        # find positions of all dudes
-        # self.find_dude_positions()
-
-    def find_dude_positions(self):
-        self.dude_pos_list = [None for x in range(DUDE_NUM)]
-
-        for i in range(DUDE_NUM):
-            index = numpy.where(self.array == DUDE_VALUE_LIST[i])
-            if index:
-                self.dude_pos_list[i] = (index[0][0], index[1][0])
 
     def paintEvent(self, event):
         rect = event.rect()  # získáme informace o překreslované oblasti
@@ -254,6 +247,11 @@ class GridWidget(QtWidgets.QWidget):
 
         # Pokud jsme v matici, aktualizujeme data
         if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
+            if self.array[row, column] == TARGET_VALUE:
+                index = numpy.where(self.array == TARGET_VALUE)
+                if len(index[0]) < 2:
+                    return
+
             if event.button() == QtCore.Qt.LeftButton:
                 if self.selected in DUDE_VALUE_LIST:
                     index = numpy.where(self.array == self.selected)
@@ -269,6 +267,18 @@ class GridWidget(QtWidgets.QWidget):
             # tímto zajistíme překreslení celého widgetu
             self.update()
 
+            analyzed_maze = analyze(self.array)
+            self.path_list = [None for x in range(DUDE_NUM)]
+
+            for i in range(DUDE_NUM):
+                index = numpy.where(self.array == DUDE_VALUE_LIST[i])
+                if len(index[0]) > 0:
+                    try:
+                        self.path_list[i] = analyzed_maze.path(index[0][0], index[1][0])
+                    except ValueError:
+                        # unreachable cell so do nothing
+                        pass
+
 
 def show_gui():
     gui = MazeGUI()
@@ -276,4 +286,3 @@ def show_gui():
     gui.window.show()
     return gui.app.exec()
 
-show_gui()
