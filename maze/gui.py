@@ -58,6 +58,22 @@ DOWN = b'v'
 LEFT = b'<'
 RIGHT = b'>'
 
+DIRS_DELTA = {
+    UP: 1,
+    DOWN: 4,
+    LEFT: 2,
+    RIGHT: 8,
+    b'X': 0,
+}
+
+ANTIDIRS_DELTA = {
+    UP: 4,
+    DOWN: 1,
+    LEFT: 8,
+    RIGHT: 2,
+    b'X': 0,
+}
+
 DIRS = {
     UP: SVG_UP,
     LEFT: SVG_LEFT,
@@ -66,8 +82,6 @@ DIRS = {
 }
 
 ROAD = [TARGET_VALUE, GRASS_VALUE] + DUDE_VALUE_LIST
-# ROAD_VERT_NEIGHBOURS = [TARGET_VALUE, UP, DOWN] + DUDE_VALUE_LIST
-# ROAD_HORIZ_NEIGHBOURS = [TARGET_VALUE, LEFT, RIGHT] + DUDE_VALUE_LIST
 
 
 def pixels_to_logical(x, y):
@@ -89,7 +103,6 @@ class MazeGUI:
 
         # bludiště zatím nadefinované rovnou v kódu
         array = numpy.zeros((15, 20), dtype=numpy.int8)
-        array[:, 5] = -1  # nějaká zeď
 
         # získáme oblast s posuvníky z Qt Designeru
         scroll_area = self.window.findChild(QtWidgets.QScrollArea, 'scrollArea')
@@ -230,7 +243,9 @@ class GridWidget(QtWidgets.QWidget):
         self.array[1, 1] = TARGET_VALUE
         self.analyzed_maze = None
         self.path_list = None
-        self.all_path_cells = None
+        # self.all_path_cells = None
+        # self.path_matrix = numpy.zeros(*array.shape, dtype=numpy.int8)
+        # self.path_matrix = {}
 
         size = logical_to_pixels(*array.shape)
         self.setMinimumSize(*size)
@@ -253,6 +268,7 @@ class GridWidget(QtWidgets.QWidget):
 
         painter = QtGui.QPainter(self)  # budeme kreslit
 
+        self.path_matrix = {}
         for row in range(row_min, row_max):
             for column in range(col_min, col_max):
                 # získáme čtvereček, který budeme vybarvovat
@@ -273,17 +289,28 @@ class GridWidget(QtWidgets.QWidget):
                             # draw roads
                             cross_sum = 0
                             for func in [self.up, self.down, self.left, self.right]:
-                                cross_sum += func((row, column))
+                                cross_sum += func((row, column), i)
 
-                            if 0 < cross_sum <= 15:
-                                svg = QtSvg.QSvgRenderer(get_filename(ROAD_PATH + str(cross_sum) + '.svg'))
-                                svg.render(painter, rect)
+                            delta = 0
+                            if self.path_matrix.get((row, column), 0) > 0:
+                                if cross_sum != self.path_matrix[(row, column)]:
+                                    direction = self.analyzed_maze.directions[row, column]
+
+                                    delta = DIRS_DELTA[direction]
+                                    if delta == 0:
+                                        # there is an end point (castle)
+                                        self.path_matrix[(row, column)] = cross_sum
+                                    else:
+                                        self.path_matrix[(row, column)] = self.path_matrix[(row, column)] + cross_sum - delta
+                            else:
+                                self.path_matrix[(row, column)] = cross_sum
+
+                            svg = QtSvg.QSvgRenderer(get_filename(ROAD_PATH + str(self.path_matrix[(row, column)]) + '.svg'))
+                            svg.render(painter, rect)
 
                             # draw arrows
                             if self.array[row, column] == GRASS_VALUE:
                                 DIRS[self.analyzed_maze.directions[row, column]].render(painter, rect)
-
-                            break
 
                 if self.array[row, column] < 0:
                     # zdi dáme jen tam, kam patří
@@ -324,34 +351,34 @@ class GridWidget(QtWidgets.QWidget):
             self.update()
             self.update_path()
 
-    def up(self, loc):
+    def up(self, loc, dude_id):
         if loc[0] == 0:
             return 0
-        elif (loc[0] - 1, loc[1]) in self.all_path_cells:
+        elif (loc[0] - 1, loc[1]) in self.path_list[dude_id]:
             return 1
         else:
             return 0
 
-    def down(self, loc):
+    def down(self, loc, dude_id):
         if loc[0] == (self.array.shape[0] - 1):
             return 0
-        elif (loc[0] + 1, loc[1]) in self.all_path_cells:
+        elif (loc[0] + 1, loc[1]) in self.path_list[dude_id]:
             return 4
         else:
             return 0
 
-    def left(self, loc):
+    def left(self, loc, dude_id):
         if loc[1] == 0:
             return 0
-        elif (loc[0], loc[1] - 1) in self.all_path_cells:
+        elif (loc[0], loc[1] - 1) in self.path_list[dude_id]:
             return 2
         else:
             return 0
 
-    def right(self, loc):
+    def right(self, loc, dude_id):
         if loc[1] == (self.array.shape[1] - 1):
             return 0
-        elif (loc[0], loc[1] + 1) in self.all_path_cells:
+        elif (loc[0], loc[1] + 1) in self.path_list[dude_id]:
             return 8
         else:
             return 0
@@ -359,6 +386,7 @@ class GridWidget(QtWidgets.QWidget):
     def update_path(self):
         self.analyzed_maze = analyze(self.array)
         self.path_list = [[] for x in range(DUDE_NUM)]
+        self.path_matrix = {}
 
         for i in range(DUDE_NUM):
             index = numpy.where(self.array == DUDE_VALUE_LIST[i])
@@ -368,10 +396,6 @@ class GridWidget(QtWidgets.QWidget):
                 except ValueError:
                     # unreachable cell so do nothing
                     pass
-
-        # get set of all path cells
-        flatten = lambda l: [item for sub_list in l for item in sub_list]
-        self.all_path_cells = set(flatten(self.path_list))
 
 
 def show_gui():
