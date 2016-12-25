@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg, uic
 import numpy
+import copy
 
 from maze import analyze
 from . import const
@@ -35,12 +36,35 @@ class GridWidget(QtWidgets.QWidget):
         self.path_list = None
         self.all_path_cells = None
 
+        # there are no unreachable dudes by default
+        self.unreachable = False
+
         size = self.logical_to_pixels(*array.shape)
         self.setMinimumSize(*size)
         self.setMaximumSize(*size)
         self.resize(*size)
 
         self.update_path()
+
+    def _draw_paths(self, painter, rect, row, column):
+        if self.all_path_cells and self.array[row, column] in const.ROAD:
+            # there is an empty cell so we draw the paths by arrows and roads if needed
+            for i in range(const.DUDE_NUM):
+                if self.path_list[i] is not None and (row, column) in self.path_list[i]:
+                    # draw roads
+                    cross_sum = 0
+                    for func in [self.up, self.down, self.left, self.right]:
+                        cross_sum += func((row, column))
+
+                    if 0 < cross_sum <= 15:
+                        svg = QtSvg.QSvgRenderer(const.get_filename(const.ROAD_PATH + str(cross_sum) + '.svg'))
+                        svg.render(painter, rect)
+
+                    # draw arrows
+                    if self.array[row, column] == const.GRASS_VALUE:
+                        const.DIRS[self.analyzed_maze.directions[row, column]].render(painter, rect)
+
+                    break
 
     def paintEvent(self, event):
         rect = event.rect()  # získáme informace o překreslované oblasti
@@ -69,24 +93,8 @@ class GridWidget(QtWidgets.QWidget):
                 # trávu dáme všude, protože i zdi stojí na trávě
                 const.SVG_GRASS.render(painter, rect)
 
-                if not self.game_mode and self.array[row, column] in const.ROAD:
-                    # there is an empty cell so we draw the paths by arrows and roads if needed
-                    for i in range(const.DUDE_NUM):
-                        if self.path_list[i] is not None and (row, column) in self.path_list[i]:
-                            # draw roads
-                            cross_sum = 0
-                            for func in [self.up, self.down, self.left, self.right]:
-                                cross_sum += func((row, column))
-
-                            if 0 < cross_sum <= 15:
-                                svg = QtSvg.QSvgRenderer(const.get_filename(const.ROAD_PATH + str(cross_sum) + '.svg'))
-                                svg.render(painter, rect)
-
-                            # draw arrows
-                            if self.array[row, column] == const.GRASS_VALUE:
-                                const.DIRS[self.analyzed_maze.directions[row, column]].render(painter, rect)
-
-                            break
+                if not self.game_mode:
+                    self._draw_paths(painter, rect, row, column)
 
                 if self.array[row, column] < 0:
                     # zdi dáme jen tam, kam patří
@@ -105,19 +113,40 @@ class GridWidget(QtWidgets.QWidget):
 
         # Pokud jsme v matici, aktualizujeme data
         if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
-            # too few targets, cannot remove
+            # game mode ON
+            if self.game_mode and \
+                    (self.array[row, column] == const.TARGET_VALUE or
+                             self.array[row, column] in const.DUDE_VALUE_LIST):
+                # there are dudes or target -> do nothing
+                return
+
+            # too few targets (castles), cannot remove
             if self.array[row, column] == const.TARGET_VALUE:
                 index = numpy.where(self.array == const.TARGET_VALUE)
                 if len(index[0]) < 2:
                     return
 
-            if event.button() == QtCore.Qt.LeftButton:
-                if self.selected in const.DUDE_VALUE_LIST or self.selected == const.TARGET_VALUE:
-                    index = numpy.where(self.array == self.selected)
-                    if len(index[0]) > 0:
-                        self.array[index[0][0], index[1][0]] = const.GRASS_VALUE
+            old_value = const.GRASS_VALUE
 
-                self.array[row, column] = self.selected
+            # removes existed dude path if this dude will be removed
+            if self.array[row, column] in const.DUDE_VALUE_LIST:
+                self.path_list[self.array[row, column] - 2] = []
+
+            if event.button() == QtCore.Qt.LeftButton:
+                if self.game_mode:
+                    old_value = self.array[row, column]
+                    self.array[row, column] = const.WALL_VALUE
+                else:
+                    if self.selected in const.DUDE_VALUE_LIST or self.selected == const.TARGET_VALUE:
+                        if self.analyzed_maze.directions[row, column] == b' ':
+                            # a player cannot give dude or target on an unreachable cell
+                            return
+
+                        index = numpy.where(self.array == self.selected)
+                        if len(index[0]) > 0:
+                            self.array[index[0][0], index[1][0]] = const.GRASS_VALUE
+
+                    self.array[row, column] = self.selected
             elif event.button() == QtCore.Qt.RightButton:
                 self.array[row, column] = const.GRASS_VALUE
             else:
@@ -125,7 +154,12 @@ class GridWidget(QtWidgets.QWidget):
 
             # tímto zajistíme překreslení celého widgetu
             self.update()
-            self.update_path()
+
+            # computes new paths
+            status = self.update_path()
+            if status:
+                # revert changes
+                self.array[row, column] = old_value
 
     def up(self, loc):
         if loc[0] == 0:
@@ -159,19 +193,45 @@ class GridWidget(QtWidgets.QWidget):
         else:
             return 0
 
-    def update_path(self):
-        self.analyzed_maze = analyze(self.array)
-        self.path_list = [[] for x in range(const.DUDE_NUM)]
-
+    def compute_paths(self):
         for i in range(const.DUDE_NUM):
             index = numpy.where(self.array == const.DUDE_VALUE_LIST[i])
             if len(index[0]) > 0:
                 try:
+                    old_path = self.path_list[i]
                     self.path_list[i] = self.analyzed_maze.path(index[0][0], index[1][0])
                 except ValueError:
-                    # unreachable cell so do nothing
-                    pass
+                    # set status in case of unreachable dudes (fools)
+                    self.path_list[i] = old_path
+                    return True
+
+        return False
+
+    def update_path(self):
+        if self.analyzed_maze:
+            prev_directions = self.analyzed_maze.directions
+        else:
+            prev_directions = None
+
+        self.analyzed_maze = analyze(self.array)
+
+        if not self.path_list:
+            self.path_list = [[] for x in range(const.DUDE_NUM)]
+
+        # computes paths
+        # in game mode returns "True" if there are unreachable dudes
+        hopeless_fools = self.compute_paths()
+
+        if hopeless_fools:
+            if prev_directions is None:
+                # we load a file with unreachable dudes
+                self.unreachable = True
+                raise ValueError('There is an unreachable dude...')
+
+            self.analyzed_maze.directions = prev_directions
 
         # get set of all path cells
         flatten = lambda l: [item for sub_list in l for item in sub_list]
         self.all_path_cells = set(flatten(self.path_list))
+
+        return hopeless_fools

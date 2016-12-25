@@ -6,6 +6,9 @@ from . import const
 from .game import Game
 
 
+PALETTE_WIDTH = 100
+
+
 class MazeGUI:
     def __init__(self):
         self.app = QtWidgets.QApplication([])
@@ -22,9 +25,12 @@ class MazeGUI:
         scroll_area = self.window.findChild(QtWidgets.QScrollArea, 'scrollArea')
 
         # dáme do ní náš grid
-        self.game = Game(array)
+        self.game = Game(array, self)
         self.grid = self.game.grid
         scroll_area.setWidget(self.grid)
+
+        # získáme paletu vytvořenou v Qt Designeru
+        self.palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
 
         self._set_buttons()
         self._set_list_widget()
@@ -47,7 +53,7 @@ class MazeGUI:
 
     def _set_list_widget(self):
         # získáme paletu vytvořenou v Qt Designeru
-        palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
+        # palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
 
         def item_activated():
             """Tato funkce se zavolá, když uživatel zvolí položku"""
@@ -55,18 +61,18 @@ class MazeGUI:
             # Položek může obecně být vybráno víc, ale v našem seznamu je to
             # zakázáno (v Designeru selectionMode=SingleSelection).
             # Projdeme "všechny vybrané položky", i když víme že bude max. jedna
-            for item in palette.selectedItems():
+            for item in self.palette.selectedItems():
                 self.grid.selected = item.data(const.CELL_ROLE)
 
-        palette.itemSelectionChanged.connect(item_activated)
+        self.palette.itemSelectionChanged.connect(item_activated)
 
-        palette.addItem(self.create_list_widget_item('Grass', const.GRASS_FILE, const.GRASS_VALUE))  # přidáme položku do palety
-        palette.addItem(self.create_list_widget_item('Wall', const.WALL_FILE, const.WALL_VALUE))
-        palette.addItem(self.create_list_widget_item('Target', const.TARGET_FILE, const.TARGET_VALUE))
+        self.palette.addItem(self.create_list_widget_item('Grass', const.GRASS_FILE, const.GRASS_VALUE))  # přidáme položku do palety
+        self.palette.addItem(self.create_list_widget_item('Wall', const.WALL_FILE, const.WALL_VALUE))
+        self.palette.addItem(self.create_list_widget_item('Target', const.TARGET_FILE, const.TARGET_VALUE))
         for i in range(const.DUDE_NUM):
-            palette.addItem(self.create_list_widget_item('Dude ' + str(i), const.DUDE_FILE_LIST[i], const.DUDE_VALUE_LIST[i]))
+            self.palette.addItem(self.create_list_widget_item('Dude ' + str(i), const.DUDE_FILE_LIST[i], const.DUDE_VALUE_LIST[i]))
 
-        palette.setCurrentRow(1)
+        self.palette.setCurrentRow(1)
 
     def create_list_widget_item(self, item_label, image_file, role_value):
         item = QtWidgets.QListWidgetItem(item_label)  # vytvoříme položku
@@ -76,6 +82,12 @@ class MazeGUI:
         item.setData(const.CELL_ROLE, role_value)
 
         return item
+
+    def hide_palette(self):
+        self.palette.setMaximumWidth(0)
+
+    def show_palette(self):
+        self.palette.setMaximumWidth(PALETTE_WIDTH)
 
     def save_dialog(self):
         filename = QtWidgets.QFileDialog.getSaveFileName(
