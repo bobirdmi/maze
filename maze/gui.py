@@ -1,79 +1,9 @@
-from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg, uic
+from PyQt5 import QtWidgets, QtGui, uic
 import numpy
 from os.path import expanduser
-import os
 
-from maze import analyze
-
-
-CELL_SIZE = 32
-CELL_ROLE = QtCore.Qt.UserRole
-
-
-WALL_VALUE = -1
-GRASS_VALUE = 0
-TARGET_VALUE = 1
-DUDE_VALUE_LIST = [2, 3, 4, 5, 6]
-DUDE_NUM = len(DUDE_VALUE_LIST)
-
-UI_PATH = './ui/'
-IMAGE_PATH = UI_PATH + 'pics/'
-ARROW_PATH = IMAGE_PATH + 'arrows/'
-ROAD_PATH = IMAGE_PATH + 'lines/'
-
-
-def get_filename(name):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
-
-
-UI_MAIN_WINDOW = get_filename(UI_PATH + 'mainwindow.ui')
-UI_NEW_MAZE = get_filename(UI_PATH + 'newmaze.ui')
-
-GRASS_FILE = get_filename(IMAGE_PATH + 'grass.svg')
-WALL_FILE = get_filename(IMAGE_PATH + 'wall.svg')
-TARGET_FILE = get_filename(IMAGE_PATH + 'castle.svg')
-DUDE_FILE_LIST = [get_filename(IMAGE_PATH + 'dude1.svg'), get_filename(IMAGE_PATH + 'dude2.svg'),
-                  get_filename(IMAGE_PATH + 'dude3.svg'), get_filename(IMAGE_PATH + 'dude4.svg'),
-                  get_filename(IMAGE_PATH + 'dude5.svg')]
-
-UP_FILE = get_filename(ARROW_PATH + 'up.svg')
-DOWN_FILE = get_filename(ARROW_PATH + 'down.svg')
-LEFT_FILE = get_filename(ARROW_PATH + 'left.svg')
-RIGHT_FILE = get_filename(ARROW_PATH + 'right.svg')
-
-SVG_GRASS = QtSvg.QSvgRenderer(GRASS_FILE)
-SVG_WALL = QtSvg.QSvgRenderer(WALL_FILE)
-SVG_TARGET = QtSvg.QSvgRenderer(TARGET_FILE)
-SVG_DUDE_LIST = [QtSvg.QSvgRenderer(DUDE_FILE_LIST[0]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[1]),
-                 QtSvg.QSvgRenderer(DUDE_FILE_LIST[2]), QtSvg.QSvgRenderer(DUDE_FILE_LIST[3]),
-                 QtSvg.QSvgRenderer(DUDE_FILE_LIST[4])]
-
-SVG_DOWN = QtSvg.QSvgRenderer(DOWN_FILE)
-SVG_UP = QtSvg.QSvgRenderer(UP_FILE)
-SVG_LEFT = QtSvg.QSvgRenderer(LEFT_FILE)
-SVG_RIGHT = QtSvg.QSvgRenderer(RIGHT_FILE)
-
-UP = b'^'
-DOWN = b'v'
-LEFT = b'<'
-RIGHT = b'>'
-
-DIRS = {
-    UP: SVG_UP,
-    LEFT: SVG_LEFT,
-    RIGHT: SVG_RIGHT,
-    DOWN: SVG_DOWN,
-}
-
-ROAD = [TARGET_VALUE, GRASS_VALUE] + DUDE_VALUE_LIST
-
-
-def pixels_to_logical(x, y):
-    return y // CELL_SIZE, x // CELL_SIZE
-
-
-def logical_to_pixels(row, column):
-    return column * CELL_SIZE, row * CELL_SIZE
+from . import const
+from .game import Game
 
 
 class MazeGUI:
@@ -82,7 +12,7 @@ class MazeGUI:
 
         self.window = QtWidgets.QMainWindow()
 
-        with open(UI_MAIN_WINDOW) as f:
+        with open(const.UI_MAIN_WINDOW) as f:
             uic.loadUi(f, self.window)
 
         # bludiště zatím nadefinované rovnou v kódu
@@ -92,13 +22,14 @@ class MazeGUI:
         scroll_area = self.window.findChild(QtWidgets.QScrollArea, 'scrollArea')
 
         # dáme do ní náš grid
-        self.grid = GridWidget(array)
+        self.game = Game(array)
+        self.grid = self.game.grid
         scroll_area.setWidget(self.grid)
 
-        self.set_buttons()
-        self.set_list_widget()
+        self._set_buttons()
+        self._set_list_widget()
 
-    def set_buttons(self):
+    def _set_buttons(self):
         action = self.window.findChild(QtWidgets.QAction, 'actionNew')
         action.triggered.connect(lambda: self.new_dialog())
 
@@ -111,7 +42,10 @@ class MazeGUI:
         action = self.window.findChild(QtWidgets.QAction, 'actionAbout')
         action.triggered.connect(lambda: self.about_dialog())
 
-    def set_list_widget(self):
+        action = self.window.findChild(QtWidgets.QAction, 'actionGame_Mode_on_off')
+        action.triggered.connect(lambda: self.game.check_play())
+
+    def _set_list_widget(self):
         # získáme paletu vytvořenou v Qt Designeru
         palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
 
@@ -122,15 +56,15 @@ class MazeGUI:
             # zakázáno (v Designeru selectionMode=SingleSelection).
             # Projdeme "všechny vybrané položky", i když víme že bude max. jedna
             for item in palette.selectedItems():
-                self.grid.selected = item.data(CELL_ROLE)
+                self.grid.selected = item.data(const.CELL_ROLE)
 
         palette.itemSelectionChanged.connect(item_activated)
 
-        palette.addItem(self.create_list_widget_item('Grass', GRASS_FILE, GRASS_VALUE))  # přidáme položku do palety
-        palette.addItem(self.create_list_widget_item('Wall', WALL_FILE, WALL_VALUE))
-        palette.addItem(self.create_list_widget_item('Target', TARGET_FILE, TARGET_VALUE))
-        for i in range(DUDE_NUM):
-            palette.addItem(self.create_list_widget_item('Dude ' + str(i), DUDE_FILE_LIST[i], DUDE_VALUE_LIST[i]))
+        palette.addItem(self.create_list_widget_item('Grass', const.GRASS_FILE, const.GRASS_VALUE))  # přidáme položku do palety
+        palette.addItem(self.create_list_widget_item('Wall', const.WALL_FILE, const.WALL_VALUE))
+        palette.addItem(self.create_list_widget_item('Target', const.TARGET_FILE, const.TARGET_VALUE))
+        for i in range(const.DUDE_NUM):
+            palette.addItem(self.create_list_widget_item('Dude ' + str(i), const.DUDE_FILE_LIST[i], const.DUDE_VALUE_LIST[i]))
 
         palette.setCurrentRow(1)
 
@@ -139,7 +73,7 @@ class MazeGUI:
         icon = QtGui.QIcon(image_file)  # ikonu
         item.setIcon(icon)  # přiřadíme ikonu položce
 
-        item.setData(CELL_ROLE, role_value)
+        item.setData(const.CELL_ROLE, role_value)
 
         return item
 
@@ -191,7 +125,7 @@ class MazeGUI:
         dialog = QtWidgets.QDialog(self.window)
 
         # Načteme layout z Qt Designeru
-        with open(UI_NEW_MAZE) as f:
+        with open(const.UI_NEW_MAZE) as f:
             uic.loadUi(f, dialog)
 
         # Zobrazíme dialog.
@@ -214,169 +148,6 @@ class MazeGUI:
 
         # Překreslení celého Gridu
         self.grid.update()
-
-
-class GridWidget(QtWidgets.QWidget):
-    def __init__(self, array):
-        super().__init__()  # musíme zavolat konstruktor předka
-        # initialize grid according to array size
-        self.init_grid(array)
-
-    def init_grid(self, array):
-        """
-        Saves the input array as self.array and initializes grid of the appropriate size.
-        """
-        self.array = array
-
-        # check whether there is already a target
-        index = numpy.where(self.array == TARGET_VALUE)
-        if len(index[0]) < 1:
-            self.array[1, 1] = TARGET_VALUE
-
-        self.analyzed_maze = None
-        self.path_list = None
-        self.all_path_cells = None
-
-        size = logical_to_pixels(*array.shape)
-        self.setMinimumSize(*size)
-        self.setMaximumSize(*size)
-        self.resize(*size)
-
-        self.update_path()
-
-    def paintEvent(self, event):
-        rect = event.rect()  # získáme informace o překreslované oblasti
-
-        # zjistíme, jakou oblast naší matice to představuje
-        # nesmíme se přitom dostat z matice ven
-        row_min, col_min = pixels_to_logical(rect.left(), rect.top())
-        row_min = max(row_min, 0)
-        col_min = max(col_min, 0)
-        row_max, col_max = pixels_to_logical(rect.right(), rect.bottom())
-        row_max = min(row_max + 1, self.array.shape[0])
-        col_max = min(col_max + 1, self.array.shape[1])
-
-        painter = QtGui.QPainter(self)  # budeme kreslit
-
-        for row in range(row_min, row_max):
-            for column in range(col_min, col_max):
-                # získáme čtvereček, který budeme vybarvovat
-                x, y = logical_to_pixels(row, column)
-                rect = QtCore.QRectF(x, y, CELL_SIZE, CELL_SIZE)
-
-                # podkladová barva pod poloprůhledné obrázky
-                white = QtGui.QColor(255, 255, 255)
-                painter.fillRect(rect, QtGui.QBrush(white))
-
-                # trávu dáme všude, protože i zdi stojí na trávě
-                SVG_GRASS.render(painter, rect)
-
-                if self.array[row, column] in ROAD:
-                    # there is an empty cell so we draw the paths by arrows and roads if needed
-                    for i in range(DUDE_NUM):
-                        if self.path_list[i] is not None and (row, column) in self.path_list[i]:
-                            # draw roads
-                            cross_sum = 0
-                            for func in [self.up, self.down, self.left, self.right]:
-                                cross_sum += func((row, column))
-
-                            if 0 < cross_sum <= 15:
-                                svg = QtSvg.QSvgRenderer(get_filename(ROAD_PATH + str(cross_sum) + '.svg'))
-                                svg.render(painter, rect)
-
-                            # draw arrows
-                            if self.array[row, column] == GRASS_VALUE:
-                                DIRS[self.analyzed_maze.directions[row, column]].render(painter, rect)
-
-                            break
-
-                if self.array[row, column] < 0:
-                    # zdi dáme jen tam, kam patří
-                    SVG_WALL.render(painter, rect)
-                elif self.array[row, column] == TARGET_VALUE:
-                    # target = castle
-                    SVG_TARGET.render(painter, rect)
-                else:
-                    if self.array[row, column] in DUDE_VALUE_LIST:
-                        # if there is any dude then draw him
-                        SVG_DUDE_LIST[DUDE_VALUE_LIST.index(self.array[row, column])].render(painter, rect)
-
-    def mousePressEvent(self, event):
-        # převedeme klik na souřadnice matice
-        row, column = pixels_to_logical(event.x(), event.y())
-
-        # Pokud jsme v matici, aktualizujeme data
-        if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
-            # too few targets, cannot remove
-            if self.array[row, column] == TARGET_VALUE:
-                index = numpy.where(self.array == TARGET_VALUE)
-                if len(index[0]) < 2:
-                    return
-
-            if event.button() == QtCore.Qt.LeftButton:
-                if self.selected in DUDE_VALUE_LIST or self.selected == TARGET_VALUE:
-                    index = numpy.where(self.array == self.selected)
-                    if len(index[0]) > 0:
-                        self.array[index[0][0], index[1][0]] = GRASS_VALUE
-
-                self.array[row, column] = self.selected
-            elif event.button() == QtCore.Qt.RightButton:
-                self.array[row, column] = GRASS_VALUE
-            else:
-                return
-
-            # tímto zajistíme překreslení celého widgetu
-            self.update()
-            self.update_path()
-
-    def up(self, loc):
-        if loc[0] == 0:
-            return 0
-        elif (loc[0] - 1, loc[1]) in self.all_path_cells:
-            return 1
-        else:
-            return 0
-
-    def down(self, loc):
-        if loc[0] == (self.array.shape[0] - 1):
-            return 0
-        elif (loc[0] + 1, loc[1]) in self.all_path_cells:
-            return 4
-        else:
-            return 0
-
-    def left(self, loc):
-        if loc[1] == 0:
-            return 0
-        elif (loc[0], loc[1] - 1) in self.all_path_cells:
-            return 2
-        else:
-            return 0
-
-    def right(self, loc):
-        if loc[1] == (self.array.shape[1] - 1):
-            return 0
-        elif (loc[0], loc[1] + 1) in self.all_path_cells:
-            return 8
-        else:
-            return 0
-
-    def update_path(self):
-        self.analyzed_maze = analyze(self.array)
-        self.path_list = [[] for x in range(DUDE_NUM)]
-
-        for i in range(DUDE_NUM):
-            index = numpy.where(self.array == DUDE_VALUE_LIST[i])
-            if len(index[0]) > 0:
-                try:
-                    self.path_list[i] = self.analyzed_maze.path(index[0][0], index[1][0])
-                except ValueError:
-                    # unreachable cell so do nothing
-                    pass
-
-        # get set of all path cells
-        flatten = lambda l: [item for sub_list in l for item in sub_list]
-        self.all_path_cells = set(flatten(self.path_list))
 
 
 def show_gui():
