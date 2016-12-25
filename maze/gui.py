@@ -66,8 +66,6 @@ DIRS = {
 }
 
 ROAD = [TARGET_VALUE, GRASS_VALUE] + DUDE_VALUE_LIST
-# ROAD_VERT_NEIGHBOURS = [TARGET_VALUE, UP, DOWN] + DUDE_VALUE_LIST
-# ROAD_HORIZ_NEIGHBOURS = [TARGET_VALUE, LEFT, RIGHT] + DUDE_VALUE_LIST
 
 
 def pixels_to_logical(x, y):
@@ -89,7 +87,6 @@ class MazeGUI:
 
         # bludiště zatím nadefinované rovnou v kódu
         array = numpy.zeros((15, 20), dtype=numpy.int8)
-        array[:, 5] = -1  # nějaká zeď
 
         # získáme oblast s posuvníky z Qt Designeru
         scroll_area = self.window.findChild(QtWidgets.QScrollArea, 'scrollArea')
@@ -151,8 +148,11 @@ class MazeGUI:
             self.window, "Save file", expanduser("~"), "Text Files (*.txt)"
         )[0]
 
-        if filename:
-            numpy.savetxt(filename, self.grid.array)
+        try:
+            if filename:
+                numpy.savetxt(filename, self.grid.array)
+        except Exception as e:
+            self.error_dialog("Error", e.__str__())
 
     def load_dialog(self):
         filename = QtWidgets.QFileDialog.getOpenFileName(
@@ -162,8 +162,8 @@ class MazeGUI:
         try:
             if filename:
                 self.grid.init_grid(numpy.loadtxt(filename, dtype=numpy.int8))
-        except ValueError as e:
-            self.error_dialog("Load error", e.__str__())
+        except Exception as e:
+            self.error_dialog("Error", e.__str__())
 
     def about_dialog(self):
         title = "Maze"
@@ -227,7 +227,12 @@ class GridWidget(QtWidgets.QWidget):
         Saves the input array as self.array and initializes grid of the appropriate size.
         """
         self.array = array
-        self.array[1, 1] = TARGET_VALUE
+
+        # check whether there is already a target
+        index = numpy.where(self.array == TARGET_VALUE)
+        if len(index[0]) < 1:
+            self.array[1, 1] = TARGET_VALUE
+
         self.analyzed_maze = None
         self.path_list = None
         self.all_path_cells = None
