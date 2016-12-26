@@ -1,31 +1,34 @@
-from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg, uic
+from PyQt5 import QtWidgets, QtGui, QtCore, QtSvg
 import numpy
-import copy
+import asyncio
 
 from maze import analyze
 from . import const
 
 
 class GridWidget(QtWidgets.QWidget):
-    def __init__(self, array):
+    def __init__(self, array, cell_size, game):
         super().__init__()  # musíme zavolat konstruktor předka
 
-        self.game_mode = False
+        self.cell_size = cell_size
+        # self.game_mode = False
+        self.game = game
 
         # initialize grid according to array size
         self.init_grid(array)
 
     def pixels_to_logical(self, x, y):
-        return y // const.CELL_SIZE, x // const.CELL_SIZE
+        return y // self.cell_size, x // self.cell_size
 
     def logical_to_pixels(self, row, column):
-        return column * const.CELL_SIZE, row * const.CELL_SIZE
+        return column * self.cell_size, row * self.cell_size
 
     def init_grid(self, array):
         """
         Saves the input array as self.array and initializes grid of the appropriate size.
         """
         self.array = array
+        self.actor_pos = {}
 
         # check whether there is already a target
         index = numpy.where(self.array == const.TARGET_VALUE)
@@ -84,7 +87,7 @@ class GridWidget(QtWidgets.QWidget):
             for column in range(col_min, col_max):
                 # získáme čtvereček, který budeme vybarvovat
                 x, y = self.logical_to_pixels(row, column)
-                rect = QtCore.QRectF(x, y, const.CELL_SIZE, const.CELL_SIZE)
+                rect = QtCore.QRectF(x, y, self.cell_size, self.cell_size)
 
                 # podkladová barva pod poloprůhledné obrázky
                 white = QtGui.QColor(255, 255, 255)
@@ -93,7 +96,7 @@ class GridWidget(QtWidgets.QWidget):
                 # trávu dáme všude, protože i zdi stojí na trávě
                 const.SVG_GRASS.render(painter, rect)
 
-                if not self.game_mode:
+                if not self.game.game_mode:
                     self._draw_paths(painter, rect, row, column)
 
                 if self.array[row, column] < 0:
@@ -103,9 +106,19 @@ class GridWidget(QtWidgets.QWidget):
                     # target = castle
                     const.SVG_TARGET.render(painter, rect)
                 else:
-                    if self.array[row, column] in const.DUDE_VALUE_LIST:
+                    if not self.game.game_mode and self.array[row, column] in const.DUDE_VALUE_LIST:
                         # if there is any dude then draw him
                         const.SVG_DUDE_LIST[const.DUDE_VALUE_LIST.index(self.array[row, column])].render(painter, rect)
+
+        if self.game.game_mode:
+            # game is on!
+            # move the dudes
+            for act in self.game.actors:
+                if act.kind in self.actor_pos.keys():
+                    x, y = self.actor_pos[act.kind]
+                    rect = QtCore.QRectF(x, y, self.cell_size, self.cell_size)
+
+                    const.SVG_DUDE_LIST[act.kind - 2].render(painter, rect)
 
     def mousePressEvent(self, event):
         # převedeme klik na souřadnice matice
@@ -114,7 +127,7 @@ class GridWidget(QtWidgets.QWidget):
         # Pokud jsme v matici, aktualizujeme data
         if 0 <= row < self.array.shape[0] and 0 <= column < self.array.shape[1]:
             # game mode ON
-            if self.game_mode and \
+            if self.game.game_mode and \
                     (self.array[row, column] == const.TARGET_VALUE or
                              self.array[row, column] in const.DUDE_VALUE_LIST):
                 # there are dudes or target -> do nothing
@@ -133,7 +146,7 @@ class GridWidget(QtWidgets.QWidget):
                 self.path_list[self.array[row, column] - 2] = []
 
             if event.button() == QtCore.Qt.LeftButton:
-                if self.game_mode:
+                if self.game.game_mode:
                     old_value = self.array[row, column]
                     self.array[row, column] = const.WALL_VALUE
                 else:
@@ -194,16 +207,28 @@ class GridWidget(QtWidgets.QWidget):
             return 0
 
     def compute_paths(self):
-        for i in range(const.DUDE_NUM):
-            index = numpy.where(self.array == const.DUDE_VALUE_LIST[i])
-            if len(index[0]) > 0:
+        if self.game.game_mode:
+            for actor in self.game.actors:
                 try:
-                    old_path = self.path_list[i]
-                    self.path_list[i] = self.analyzed_maze.path(index[0][0], index[1][0])
+                    index = actor.kind - 2
+                    old_path = self.path_list[index]
+                    # TODO how to compute path with float coordinates
+                    self.path_list[index] = self.analyzed_maze.path(int(actor.column), int(actor.row))
                 except ValueError:
                     # set status in case of unreachable dudes (fools)
-                    self.path_list[i] = old_path
+                    self.path_list[index] = old_path
                     return True
+        else:
+            for i in range(const.DUDE_NUM):
+                index = numpy.where(self.array == const.DUDE_VALUE_LIST[i])
+                if len(index[0]) > 0:
+                    try:
+                        old_path = self.path_list[i]
+                        self.path_list[i] = self.analyzed_maze.path(index[0][0], index[1][0])
+                    except ValueError:
+                        # set status in case of unreachable dudes (fools)
+                        self.path_list[i] = old_path
+                        return True
 
         return False
 
@@ -234,4 +259,15 @@ class GridWidget(QtWidgets.QWidget):
         flatten = lambda l: [item for sub_list in l for item in sub_list]
         self.all_path_cells = set(flatten(self.path_list))
 
+        self.directions = self.analyzed_maze.directions
+
         return hopeless_fools
+
+    def update_actor(self, actor):
+        # save new position of an actor
+        x, y = self.logical_to_pixels(actor.row, actor.column)
+
+        self.actor_pos[actor.kind] = (x, y)
+        self.update()
+
+

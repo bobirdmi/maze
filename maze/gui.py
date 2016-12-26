@@ -1,6 +1,8 @@
 from PyQt5 import QtWidgets, QtGui, uic
 import numpy
 from os.path import expanduser
+from quamash import QEventLoop
+import asyncio
 
 from . import const
 from .game import Game
@@ -12,6 +14,8 @@ PALETTE_WIDTH = 100
 class MazeGUI:
     def __init__(self):
         self.app = QtWidgets.QApplication([])
+        self.loop = QEventLoop(self.app)
+        asyncio.set_event_loop(self.loop)
 
         self.window = QtWidgets.QMainWindow()
 
@@ -34,6 +38,11 @@ class MazeGUI:
 
         self._set_buttons()
         self._set_list_widget()
+
+    def run(self):
+        self.window.show()
+        self.loop.run_forever()
+        # return gui.app.exec()
 
     def _set_buttons(self):
         action = self.window.findChild(QtWidgets.QAction, 'actionNew')
@@ -164,7 +173,6 @@ class MazeGUI:
 
 def show_gui():
     gui = MazeGUI()
+    gui.run()
 
-    gui.window.show()
-    return gui.app.exec()
 
