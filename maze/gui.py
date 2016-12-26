@@ -42,7 +42,6 @@ class MazeGUI:
     def run(self):
         self.window.show()
         self.loop.run_forever()
-        # return gui.app.exec()
 
     def _set_buttons(self):
         action = self.window.findChild(QtWidgets.QAction, 'actionNew')

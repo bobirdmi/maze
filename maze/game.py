@@ -15,7 +15,6 @@ class Game:
         self.gui = gui
 
     def check_play(self):
-        # TODO
         self.game_mode = not self.game_mode
 
         if self.grid.unreachable:
@@ -28,19 +27,19 @@ class Game:
             self.edit_array = copy.deepcopy(self.grid.array)
 
             # initialize actors
+            self.actors = []
             for i in range(const.DUDE_NUM):
                 index = numpy.where(self.edit_array == const.DUDE_VALUE_LIST[i])
                 if len(index[0]) > 0:
                     self.actors.append(actor.Actor(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
                     # remove dude from a grid array
-                    self.grid.array[index[1][0], index[0][0]] = const.GRASS_VALUE
+                    self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
         else:
             self.gui.show_palette()
 
             self.grid.array = copy.deepcopy(self.edit_array)
             self.grid.update_path()
             self.grid.update()
-
 
 
 
