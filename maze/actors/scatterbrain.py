@@ -30,24 +30,11 @@ class Scatterbrain(Actor):
                 self.direction = b'?'
 
             if random.uniform(0, 1) <= self.probability:
-                # go in random direction, but not by computed path
-                dirs = list(DIRS)
+                possible_dirs = await self._get_possible_dirs(row, column, shape)
 
-                if row + 1 >= shape[0] or self.grid.directions[row + 1, column] == b'#':
-                    dirs.remove(b'v')
-                if row - 1 < 0 or self.grid.directions[row - 1, column] == b'#':
-                    dirs.remove(b'^')
-                if column + 1 >= shape[1] or self.grid.directions[row, column + 1] == b'#':
-                    dirs.remove(b'>')
-                if column - 1 < 0 or self.grid.directions[row, column - 1] == b'#':
-                    dirs.remove(b'<')
+                index = random.randrange(0, len(possible_dirs))
 
-                if len(dirs) > 1 and self.direction in dirs:
-                    dirs.remove(self.direction)
-
-                index = random.randrange(0, len(dirs))
-
-                self.direction = dirs[index]
+                self.direction = possible_dirs[index]
 
             if self.direction == b'v':
                 await self.step(1, 0)
@@ -62,3 +49,20 @@ class Scatterbrain(Actor):
             else:
                 await self.jump()
 
+    async def _get_possible_dirs(self, row, column, shape):
+        dirs = list(DIRS)
+
+        # go in random direction without wall, but not by computed path
+        if row + 1 >= shape[0] or self.grid.directions[row + 1, column] == b'#':
+            dirs.remove(b'v')
+        if row - 1 < 0 or self.grid.directions[row - 1, column] == b'#':
+            dirs.remove(b'^')
+        if column + 1 >= shape[1] or self.grid.directions[row, column + 1] == b'#':
+            dirs.remove(b'>')
+        if column - 1 < 0 or self.grid.directions[row, column - 1] == b'#':
+            dirs.remove(b'<')
+
+        if len(dirs) > 1 and self.direction in dirs:
+            dirs.remove(self.direction)
+
+        return dirs

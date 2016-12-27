@@ -24,23 +24,10 @@ class Teleporter(Actor):
 
             if random.uniform(0, 1) <= self.probability:
                 # teleportation!
-                castle_pos = numpy.where(self.grid.array == 1)
-                castle_row = castle_pos[0][0]
-                castle_column = castle_pos[1][0]
-
-                # teleportation cannot be closer to castle than 5 tiles
-                while True:
-                    new_row = random.randrange(0, shape[0])
-                    new_column = random.randrange(0, shape[1])
-
-                    if abs(new_column - castle_column) >= 5 or abs(new_row - castle_row) >= 5:
-                        break
-
                 await self.teleport()
                 await self.teleport()
 
-                self.row = new_row
-                self.column = new_column
+                self.row, self.column = await self._get_random_coord(shape)
 
                 await self.teleport()
                 await self.teleport()
@@ -64,6 +51,22 @@ class Teleporter(Actor):
                 break
             else:
                 await self.jump()
+
+    async def _get_random_coord(self, shape):
+        castle_pos = numpy.where(self.grid.array == 1)
+        castle_row = castle_pos[0][0]
+        castle_column = castle_pos[1][0]
+
+        while True:
+            new_row = random.randrange(0, shape[0])
+            new_column = random.randrange(0, shape[1])
+
+            # teleportation cannot be closer to castle than 5 tiles
+            if (abs(new_column - castle_column) >= 5 or abs(new_row - castle_row) >= 5) \
+                    and self.grid.directions[new_row, new_column] != b'#':
+                break
+
+        return new_row, new_column
 
     async def teleport(self, duration=0.1):
         """Coroutine for a teleport

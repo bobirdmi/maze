@@ -7,6 +7,7 @@ from maze.actors.speedster import Speedster
 from maze.actors.accelerator import Accelerator
 from maze.actors.scatterbrain import Scatterbrain
 from maze.actors.teleporter import Teleporter
+from maze.actors.jumper import Jumper
 from . import const
 from .grid_widget import GridWidget
 
@@ -42,14 +43,6 @@ class Game:
             self.actors = []
             for i in range(const.DUDE_NUM):
                 self._init_actor(const.DUDE_VALUE_LIST[i])
-                # index = numpy.where(self.edit_array == const.DUDE_VALUE_LIST[i])
-                # if len(index[0]) > 0:
-                #     if i == 0:
-                #         self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
-                #     else:
-                #         self.actors.append(Actor(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
-                #     # remove dude from a grid array
-                #     self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
         else:
             self.disable_actors()
 
@@ -72,8 +65,8 @@ class Game:
                 self.actors.append(Accelerator(self.grid, index[0][0], index[1][0], kind))
             elif kind == 5:
                 self.actors.append(Teleporter(self.grid, index[0][0], index[1][0], kind))
-            # elif kind == 6:
-            #     self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
+            elif kind == 6:
+                self.actors.append(Jumper(self.grid, index[0][0], index[1][0], kind))
 
             self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
 
