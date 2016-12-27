@@ -120,6 +120,10 @@ class GridWidget(QtWidgets.QWidget):
 
                     const.SVG_DUDE_LIST[act.kind - 2].render(painter, rect)
 
+            if self.game.game_over:
+                self.game.disable_actors()
+                self.game.show_result()
+
     def mousePressEvent(self, event):
         # převedeme klik na souřadnice matice
         row, column = self.pixels_to_logical(event.x(), event.y())
@@ -129,7 +133,7 @@ class GridWidget(QtWidgets.QWidget):
             # game mode ON
             if self.game.game_mode and \
                     (self.array[row, column] == const.TARGET_VALUE or
-                             self.array[row, column] in const.DUDE_VALUE_LIST):
+                             self.game.is_actor_on_tile(row, column)):
                 # there are dudes or target -> do nothing
                 return
 
@@ -208,12 +212,28 @@ class GridWidget(QtWidgets.QWidget):
 
     def compute_paths(self):
         if self.game.game_mode:
-            for actor in self.game.actors:
+            for act in self.game.actors:
                 try:
-                    index = actor.kind - 2
+                    index = act.kind - 2
                     old_path = self.path_list[index]
-                    # TODO how to compute path with float coordinates
-                    self.path_list[index] = self.analyzed_maze.path(int(actor.column), int(actor.row))
+
+                    if act.direction == b'>':
+                        row = act.row
+                        column = int(act.column + 1.0)
+                    elif act.direction == b'<':
+                        row = act.row
+                        column = int(act.column)
+                    elif act.direction == b'^':
+                        row = int(act.row)
+                        column = act.column
+                    elif act.direction == b'v':
+                        row = int(act.row + 1.0)
+                        column = act.column
+                    else:
+                        row = int(act.row)
+                        column = int(act.column)
+
+                    self.path_list[index] = self.analyzed_maze.path(int(column), int(row))
                 except ValueError:
                     # set status in case of unreachable dudes (fools)
                     self.path_list[index] = old_path
@@ -255,6 +275,8 @@ class GridWidget(QtWidgets.QWidget):
 
             self.analyzed_maze.directions = prev_directions
 
+        self.unreachable = False
+
         # get set of all path cells
         flatten = lambda l: [item for sub_list in l for item in sub_list]
         self.all_path_cells = set(flatten(self.path_list))
@@ -266,8 +288,16 @@ class GridWidget(QtWidgets.QWidget):
     def update_actor(self, actor):
         # save new position of an actor
         x, y = self.logical_to_pixels(actor.row, actor.column)
-
         self.actor_pos[actor.kind] = (x, y)
+
+        # is it game over (dude is in a castle)?
+        if actor.row - int(actor.row) == 0 and actor.column - int(actor.column) == 0 \
+                and self.directions[int(actor.row), int(actor.column)] == b'X':
+            self.game.game_over = True
+
         self.update()
+
+
+
 
 

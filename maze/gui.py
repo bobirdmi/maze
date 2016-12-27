@@ -59,6 +59,20 @@ class MazeGUI:
         action = self.window.findChild(QtWidgets.QAction, 'actionGame_Mode_on_off')
         action.triggered.connect(lambda: self.game.check_play())
 
+    def uncheck_game_mode_button(self):
+        action = self.window.findChild(QtWidgets.QAction, 'actionGame_Mode_on_off')
+        action.setChecked(False)
+
+    def turn_nongame_buttons(self, bool):
+        action = self.window.findChild(QtWidgets.QAction, 'actionNew')
+        action.setEnabled(bool)
+
+        action = self.window.findChild(QtWidgets.QAction, 'actionSave')
+        action.setEnabled(bool)
+
+        action = self.window.findChild(QtWidgets.QAction, 'actionLoad')
+        action.setEnabled(bool)
+
     def _set_list_widget(self):
         # získáme paletu vytvořenou v Qt Designeru
         # palette = self.window.findChild(QtWidgets.QListWidget, 'palette')
@@ -118,6 +132,12 @@ class MazeGUI:
                 self.grid.init_grid(numpy.loadtxt(filename, dtype=numpy.int8))
         except Exception as e:
             self.error_dialog("Error", e.__str__())
+
+    def game_result_dialog(self, time_result):
+        title = 'Game Over'
+        body = 'You resisted fate for {:.2f} minutes!'.format(time_result/60)
+
+        QtWidgets.QMessageBox.about(self.window, title, body)
 
     def about_dialog(self):
         title = "Maze"
