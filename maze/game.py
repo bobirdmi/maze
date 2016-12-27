@@ -3,10 +3,10 @@ import time
 
 import numpy
 
-from maze.actors.actor import Actor
 from maze.actors.speedster import Speedster
 from maze.actors.accelerator import Accelerator
 from maze.actors.scatterbrain import Scatterbrain
+from maze.actors.teleporter import Teleporter
 from . import const
 from .grid_widget import GridWidget
 
@@ -70,8 +70,8 @@ class Game:
                 self.actors.append(Speedster(self.grid, index[0][0], index[1][0], kind))
             elif kind == 4:
                 self.actors.append(Accelerator(self.grid, index[0][0], index[1][0], kind))
-            # elif kind == 5:
-            #     self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
+            elif kind == 5:
+                self.actors.append(Teleporter(self.grid, index[0][0], index[1][0], kind))
             # elif kind == 6:
             #     self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
 
