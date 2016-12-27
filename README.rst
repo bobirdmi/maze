@@ -3,6 +3,18 @@ Maze solver
 
 Homework solution for course MI-PYT on FIT CTU in Prague.
 
+About maze
+==========
+There were implemented 5 actor types:
+
+- Accelerator (increases speed with a little less speedup with each succeeded try with probability of 10%,
+up to 75% faster than the standard actor speed)
+- Scatterbrain (moves in random wrong direction with probability of 20%)
+- Speedster (moves 50% faster than the standard actor)
+- Teleporter (teleports into random place (not walls and castle) with probability of 20%,
+cannot perform teleportation closer than 5 tiles to castle)
+- Jumper (jumps through a wall with probability of 20% if a path behind the wall is shorter)
+
 Installation
 ============
 
