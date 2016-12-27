@@ -1,10 +1,14 @@
-from .grid_widget import GridWidget
-from . import const, actor
-
-import numpy
 import copy
 import time
-import asyncio
+
+import numpy
+
+from maze.actors.actor import Actor
+from maze.actors.speedster import Speedster
+from maze.actors.accelerator import Accelerator
+from maze.actors.scatterbrain import Scatterbrain
+from . import const
+from .grid_widget import GridWidget
 
 
 class Game:
@@ -37,11 +41,15 @@ class Game:
             # initialize actors
             self.actors = []
             for i in range(const.DUDE_NUM):
-                index = numpy.where(self.edit_array == const.DUDE_VALUE_LIST[i])
-                if len(index[0]) > 0:
-                    self.actors.append(actor.Actor(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
-                    # remove dude from a grid array
-                    self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
+                self._init_actor(const.DUDE_VALUE_LIST[i])
+                # index = numpy.where(self.edit_array == const.DUDE_VALUE_LIST[i])
+                # if len(index[0]) > 0:
+                #     if i == 0:
+                #         self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
+                #     else:
+                #         self.actors.append(Actor(self.grid, index[0][0], index[1][0], const.DUDE_VALUE_LIST[i]))
+                #     # remove dude from a grid array
+                #     self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
         else:
             self.disable_actors()
 
@@ -51,6 +59,23 @@ class Game:
             self.grid.array = copy.deepcopy(self.edit_array)
             self.grid.update_path()
             self.grid.update()
+
+    def _init_actor(self, kind):
+        index = numpy.where(self.edit_array == kind)
+
+        if len(index[0]) > 0:
+            if kind == 2:
+                self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
+            elif kind == 3:
+                self.actors.append(Speedster(self.grid, index[0][0], index[1][0], kind))
+            elif kind == 4:
+                self.actors.append(Accelerator(self.grid, index[0][0], index[1][0], kind))
+            # elif kind == 5:
+            #     self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
+            # elif kind == 6:
+            #     self.actors.append(Scatterbrain(self.grid, index[0][0], index[1][0], kind))
+
+            self.grid.array[index[0][0], index[1][0]] = const.GRASS_VALUE
 
     def disable_actors(self):
         for act in self.actors:
@@ -79,8 +104,3 @@ class Game:
 
         self.gui.game_result_dialog(end_time - self.start_time)
 
-    # async def check_game_over(self):
-    #     if (await self.actors[0].task): #\
-    #             # or (await self.actors[1].task) or (await self.actors[2].task) or \
-    #             # (await self.actors[3].task) or (await self.actors[4].task):
-    #         return

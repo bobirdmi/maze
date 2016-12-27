@@ -91,8 +91,10 @@ class MazeGUI:
         self.palette.addItem(self.create_list_widget_item('Grass', const.GRASS_FILE, const.GRASS_VALUE))  # přidáme položku do palety
         self.palette.addItem(self.create_list_widget_item('Wall', const.WALL_FILE, const.WALL_VALUE))
         self.palette.addItem(self.create_list_widget_item('Target', const.TARGET_FILE, const.TARGET_VALUE))
-        for i in range(const.DUDE_NUM):
-            self.palette.addItem(self.create_list_widget_item('Dude ' + str(i), const.DUDE_FILE_LIST[i], const.DUDE_VALUE_LIST[i]))
+
+        dude_types = ['Scatterbrain', 'Speedster', 'Accelerator', 'TODO', 'TODO2']
+        for i, dude_type in zip(range(const.DUDE_NUM), dude_types):
+            self.palette.addItem(self.create_list_widget_item(dude_type, const.DUDE_FILE_LIST[i], const.DUDE_VALUE_LIST[i]))
 
         self.palette.setCurrentRow(1)
 
