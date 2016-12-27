@@ -11,5 +11,6 @@ setup(
         'Cython',
         'NumPy',
         'quamash',
+        'PyQt5',
     ],
 )
